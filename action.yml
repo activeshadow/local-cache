@@ -7,6 +7,10 @@ inputs:
   key:
     description: 'An explicit key for a cache.'
     required: true
+  via:
+    description: 'Method to use for restoring cache (link or copy).'
+    required: true
+    default: 'link'
   base:
     description: 'A base directory to save and restore cache.'
     required: false

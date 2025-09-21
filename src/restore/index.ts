@@ -6,28 +6,29 @@ import {
   exec,
   getCacheBase,
   getCachePath
-} from '../utils/cache'
+} from '../utils/cache.js'
 
 async function run(): Promise<void> {
   try {
     /* 
       clean up caches
     */
-      const cacheBase = core.getState('cache-base')
-      const cleanKey = core.getInput('clean-key')
-      const CLEAN_TIME = 7
-  
-      if (cleanKey) {
-        await exec(
-          `/bin/bash -c "find ${cacheBase} -maxdepth 1 -name '${cleanKey}*' -type d -atime +${CLEAN_TIME} -exec rm -rf {} +"`
-        )
-      }
-    } catch (error) {
-      if (error instanceof Error) core.warning(error.message)
+    const cacheBase = core.getState('cache-base')
+    const cleanKey = core.getInput('clean-key')
+    const CLEAN_TIME = 7
+
+    if (cleanKey) {
+      await exec(
+        `/bin/bash -c "find ${cacheBase} -maxdepth 1 -name '${cleanKey}*' -type d -atime +${CLEAN_TIME} -exec rm -rf {} +"`
+      )
     }
+  } catch (error) {
+    if (error instanceof Error) core.warning(error.message)
+  }
 
   try {
     const key = core.getInput('key')
+    const via = core.getInput('via')
     const base = core.getInput('base')
     const path = core.getInput('path')
     const cacheBase = getCacheBase(base)
@@ -50,13 +51,30 @@ async function run(): Promise<void> {
     core.setOutput('cache-hit', String(cacheHit))
 
     if (cacheHit === true) {
-      const ln = await exec(
-        `ln -s ${p.join(cachePath, path.split('/').slice(-1)[0])} ./${path}`
-      )
+      let restore = null
 
-      core.debug(ln.stdout)
-      if (ln.stderr) core.error(ln.stderr)
-      if (!ln.stderr) core.info(`Cache restored with key ${key}`)
+      if (via === 'link') {
+        restore = await exec(
+          `ln -s ${p.join(cachePath, path.split('/').slice(-1)[0])} ./${path}`
+        )
+      } else if (via === 'copy') {
+        restore = await exec(
+          `cp -a ${p.join(cachePath, path.split('/').slice(-1)[0])} ./${path}`
+        )
+      } else {
+        core.error(
+          `Unrecognized "via" input value of "${via} provided -- defaulting to "link"`
+        )
+
+        restore = await exec(
+          `ln -s ${p.join(cachePath, path.split('/').slice(-1)[0])} ./${path}`
+        )
+      }
+
+      core.debug(restore.stdout)
+
+      if (restore.stderr) core.error(restore.stderr)
+      if (!restore.stderr) core.info(`Cache restored with key ${key}`)
     } else {
       core.info(`Cache not found for ${key}`)
     }
